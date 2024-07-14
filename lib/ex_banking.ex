@@ -17,7 +17,7 @@ defmodule ExBanking do
 
   # ------API------
   @spec create_user(user :: String.t()) :: :ok | {:error, :wrong_arguments | :user_already_exists}
-  def create_user(user) when is_binary(user) do
+  def create_user(user) when is_binary(user) and user != "" do
     Task.start(fn -> do_create_user(user) end)
     :ok
   end
