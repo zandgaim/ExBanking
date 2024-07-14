@@ -13,7 +13,6 @@ defmodule UserWorker do
   end
 
   def handle_call({:deposit, amount, currency}, _from, state) do
-    :timer.sleep(4000)
     Logger.debug("#{state[:id]} deposit #{amount}(#{currency})")
     update_wallet(:deposit, {state, currency, amount})
   end
@@ -25,7 +24,6 @@ defmodule UserWorker do
 
   def handle_call({:get_balance, currency}, _from, state) do
     Logger.debug("#{state[:id]} get_balance (#{currency})")
-    :timer.sleep(4000)
     {:reply, {:ok, Map.get(state, currency, 0)}, state}
   end
 
@@ -59,7 +57,7 @@ defmodule UserWorker do
 
   # ------Helpers-------
 
-  def update_wallet(:withdraw, {state, currency, amount}) do
+  defp update_wallet(:withdraw, {state, currency, amount}) do
     case Map.get(state, currency, 0) < amount do
       true ->
         {:reply, {:error, :not_enough_money}, state}
@@ -70,7 +68,7 @@ defmodule UserWorker do
     end
   end
 
-  def update_wallet(:deposit, {state, currency, amount}) do
+  defp update_wallet(:deposit, {state, currency, amount}) do
     new_state = Map.update(state, currency, amount, &(&1 + amount))
     {:reply, {:ok, new_state[currency]}, new_state}
   end

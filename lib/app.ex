@@ -3,6 +3,8 @@ defmodule App do
 
   def start(_type, _args) do
     children = [
+      {Task.Supervisor, [name: ExBanking.TaskSupervisor]},
+      {ExBanking, []},
       {Sup, []}
     ]
 
