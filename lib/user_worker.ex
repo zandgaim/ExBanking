@@ -36,7 +36,7 @@ defmodule UserWorker do
           {:ok, to_user_balance} ->
             {:reply, {:ok, from_user_balance, to_user_balance}, new_state}
 
-          {:error, _} = reply ->
+          {:error, _} ->
             {:reply, {:error, :receiver_error}, state}
         end
 
@@ -58,18 +58,32 @@ defmodule UserWorker do
   # ------Helpers-------
 
   defp update_wallet(:withdraw, {state, currency, amount}) do
-    case Map.get(state, currency, 0) < amount do
+    curAmount = Map.get(state, currency, 0)
+
+    case curAmount < amount do
       true ->
         {:reply, {:error, :not_enough_money}, state}
 
       false ->
-        new_state = Map.update(state, currency, amount, &(&1 - amount))
+        newAmount = format_money(curAmount - amount)
+        new_state = Map.put(state, currency, newAmount)
         {:reply, {:ok, new_state[currency]}, new_state}
     end
   end
 
   defp update_wallet(:deposit, {state, currency, amount}) do
-    new_state = Map.update(state, currency, amount, &(&1 + amount))
+    curAmount = Map.get(state, currency, 0)
+    newAmount = format_money(curAmount + amount)
+    new_state = Map.put(state, currency, newAmount)
     {:reply, {:ok, new_state[currency]}, new_state}
+  end
+
+  defp format_money(amount) when is_float(amount) do
+    :erlang.float_to_binary(amount, decimals: 2)
+    |> :erlang.binary_to_float()
+  end
+
+  defp format_money(amount) when is_integer(amount) do
+    Float.round(amount / 1, 2)
   end
 end

@@ -30,7 +30,7 @@ defmodule ExBanking do
           {:ok, new_balance :: number}
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
   def deposit(user, amount, currency)
-      when is_binary(user) and is_number(amount) and is_binary(currency) do
+      when is_binary(user) and is_number(amount) and is_binary(currency) and amount >= 0 do
     Task.start(fn -> do_deposit(user, amount, currency) end)
     :ok
   end
@@ -47,7 +47,7 @@ defmodule ExBanking do
              | :not_enough_money
              | :too_many_requests_to_user}
   def withdraw(user, amount, currency)
-      when is_binary(user) and is_number(amount) and is_binary(currency) do
+      when is_binary(user) and is_number(amount) and is_binary(currency) and amount >= 0 do
     Task.start(fn -> do_withdraw(user, amount, currency) end)
     :ok
   end
@@ -84,7 +84,7 @@ defmodule ExBanking do
              | :too_many_requests_to_receiver}
   def send(from_user, to_user, amount, currency)
       when is_binary(from_user) and is_binary(to_user) and is_number(amount) and
-             is_binary(currency) do
+             is_binary(currency) and amount >= 0 do
     Task.start(fn -> do_send(from_user, to_user, amount, currency) end)
     :ok
   end
@@ -113,7 +113,7 @@ defmodule ExBanking do
     response =
       case find_user_and_check_queue(user) do
         {:ok, pid} -> GenServer.call(pid, {:deposit, amount, currency})
-        error -> error
+        error -> {:error, error}
       end
 
     display(response)
@@ -123,7 +123,7 @@ defmodule ExBanking do
     response =
       case find_user_and_check_queue(user) do
         {:ok, pid} -> GenServer.call(pid, {:withdraw, amount, currency})
-        error -> error
+        error -> {:error, error}
       end
 
     display(response)
@@ -133,7 +133,7 @@ defmodule ExBanking do
     response =
       case find_user_and_check_queue(user) do
         {:ok, pid} -> GenServer.call(pid, {:get_balance, currency})
-        error -> error
+        error -> {:error, error}
       end
 
     display(response)
@@ -145,16 +145,16 @@ defmodule ExBanking do
         {{:ok, from_pid}, {:ok, to_pid}} ->
           GenServer.call(from_pid, {:send, to_pid, amount, currency})
 
-        {{:error, :user_does_not_exist}, _} ->
+        {:user_does_not_exist, _} ->
           {:error, :sender_does_not_exist}
 
-        {{:error, :too_many_requests_to_user}, _} ->
+        {:too_many_requests_to_user, _} ->
           {:error, :too_many_requests_to_sender}
 
-        {_, {:error, :user_does_not_exist}} ->
+        {_, :user_does_not_exist} ->
           {:error, :receiver_does_not_exist}
 
-        {_, {:error, :too_many_requests_to_user}} ->
+        {_, :too_many_requests_to_user} ->
           {:error, :too_many_requests_to_receiver}
       end
 
@@ -169,7 +169,7 @@ defmodule ExBanking do
   defp find_user_and_check_queue(user) do
     case :global.whereis_name(user) do
       :undefined ->
-        {:error, :user_does_not_exist}
+        :user_does_not_exist
 
       pid ->
         case Process.info(pid, :message_queue_len) do
@@ -177,7 +177,7 @@ defmodule ExBanking do
             {:ok, pid}
 
           len ->
-            {:error, :too_many_requests_to_user}
+            :too_many_requests_to_user
         end
     end
   end
