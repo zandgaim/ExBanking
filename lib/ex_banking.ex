@@ -27,9 +27,13 @@ defmodule ExBanking do
 
   @spec deposit(user :: String.t(), amount :: number, currency :: String.t()) ::
           {:ok, new_balance :: number}
-          | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
+          | {:error,
+             :wrong_arguments
+             | :user_does_not_exist
+             | :too_many_requests_to_user}
   def deposit(user, amount, currency)
-      when is_binary(user) and is_number(amount) and is_binary(currency) and amount >= 0 do
+      when is_binary(user) and user != "" and is_binary(currency) and
+             currency != "" and is_number(amount) and amount >= 0 do
     do_deposit(user, amount, currency)
   end
 
@@ -45,7 +49,8 @@ defmodule ExBanking do
              | :not_enough_money
              | :too_many_requests_to_user}
   def withdraw(user, amount, currency)
-      when is_binary(user) and is_number(amount) and is_binary(currency) and amount >= 0 do
+      when is_binary(user) and user != "" and currency != "" and is_binary(currency) and is_number(amount) and
+             amount >= 0 do
     do_withdraw(user, amount, currency)
   end
 
@@ -56,7 +61,8 @@ defmodule ExBanking do
   @spec get_balance(user :: String.t(), currency :: String.t()) ::
           {:ok, balance :: number}
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
-  def get_balance(user, currency) when is_binary(user) and is_binary(currency) do
+  def get_balance(user, currency)
+      when is_binary(user) and user != "" and is_binary(currency) and currency != "" do
     do_get_balance(user, currency)
   end
 
@@ -79,8 +85,8 @@ defmodule ExBanking do
              | :too_many_requests_to_sender
              | :too_many_requests_to_receiver}
   def send(from_user, to_user, amount, currency)
-      when is_binary(from_user) and is_binary(to_user) and is_number(amount) and
-             is_binary(currency) and amount >= 0 do
+      when is_binary(from_user) and from_user != "" and is_binary(to_user) and to_user != "" and
+             is_binary(currency) and currency != "" and is_number(amount) and amount >= 0 do
     do_send(from_user, to_user, amount, currency)
   end
 
