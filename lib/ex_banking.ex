@@ -31,8 +31,7 @@ defmodule ExBanking do
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
   def deposit(user, amount, currency)
       when is_binary(user) and is_number(amount) and is_binary(currency) and amount >= 0 do
-    Task.start(fn -> do_deposit(user, amount, currency) end)
-    :ok
+    do_deposit(user, amount, currency)
   end
 
   def deposit(user, amount, currency) do
@@ -48,8 +47,7 @@ defmodule ExBanking do
              | :too_many_requests_to_user}
   def withdraw(user, amount, currency)
       when is_binary(user) and is_number(amount) and is_binary(currency) and amount >= 0 do
-    Task.start(fn -> do_withdraw(user, amount, currency) end)
-    :ok
+    do_withdraw(user, amount, currency)
   end
 
   def withdraw(user, amount, currency) do
@@ -60,8 +58,7 @@ defmodule ExBanking do
           {:ok, balance :: number}
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
   def get_balance(user, currency) when is_binary(user) and is_binary(currency) do
-    Task.start(fn -> do_get_balance(user, currency) end)
-    :ok
+    do_get_balance(user, currency)
   end
 
   def get_balance(user, currency) do
@@ -85,8 +82,7 @@ defmodule ExBanking do
   def send(from_user, to_user, amount, currency)
       when is_binary(from_user) and is_binary(to_user) and is_number(amount) and
              is_binary(currency) and amount >= 0 do
-    Task.start(fn -> do_send(from_user, to_user, amount, currency) end)
-    :ok
+    do_send(from_user, to_user, amount, currency)
   end
 
   def send(from_user, to_user, amount, currency) do
@@ -96,54 +92,39 @@ defmodule ExBanking do
   # ------------------
 
   defp do_create_user(user) do
-    response =
-      case :global.whereis_name(user) do
-        :undefined ->
-          Sup.init_user(user)
+      case Sup.init_user({user}) do
+        {:ok, _} ->
           :ok
-
         _ ->
           {:error, :user_already_exists}
       end
-
-    display(response)
   end
 
   defp do_deposit(user, amount, currency) do
-    response =
       case find_user_and_check_queue(user) do
-        {:ok, pid} -> GenServer.call(pid, {:deposit, amount, currency})
+        {:ok, pid} -> GenServer.cast(pid, {:deposit, amount, currency})
         error -> {:error, error}
       end
-
-    display(response)
   end
 
   defp do_withdraw(user, amount, currency) do
-    response =
       case find_user_and_check_queue(user) do
-        {:ok, pid} -> GenServer.call(pid, {:withdraw, amount, currency})
+        {:ok, pid} -> GenServer.cast(pid, {:withdraw, amount, currency})
         error -> {:error, error}
       end
-
-    display(response)
   end
 
   defp do_get_balance(user, currency) do
-    response =
       case find_user_and_check_queue(user) do
-        {:ok, pid} -> GenServer.call(pid, {:get_balance, currency})
+        {:ok, pid} -> GenServer.cast(pid, {:get_balance, currency})
         error -> {:error, error}
       end
-
-    display(response)
   end
 
   defp do_send(from_user, to_user, amount, currency) do
-    response =
       case {find_user_and_check_queue(from_user), find_user_and_check_queue(to_user)} do
         {{:ok, from_pid}, {:ok, to_pid}} ->
-          GenServer.call(from_pid, {:send, to_pid, amount, currency})
+          GenServer.cast(from_pid, {:send, to_pid, amount, currency})
 
         {:user_does_not_exist, _} ->
           {:error, :sender_does_not_exist}
@@ -157,12 +138,10 @@ defmodule ExBanking do
         {_, :too_many_requests_to_user} ->
           {:error, :too_many_requests_to_receiver}
       end
-
-    display(response)
   end
 
   # ------helpers------
-  defp display(msg) do
+  def display(msg) do
     GenServer.cast(__MODULE__, msg)
   end
 

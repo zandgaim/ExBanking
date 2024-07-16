@@ -8,39 +8,52 @@ defmodule UserWorker do
   end
 
   def init([userId]) do
-    state = %{:id => userId}
+    serverPid = Process.whereis(ExBanking)
+    state = %{:id => userId, :server => serverPid}
     {:ok, state}
   end
 
   def handle_call({:deposit, amount, currency}, _from, state) do
     Logger.debug("#{state[:id]} deposit #{amount}(#{currency})")
-    update_wallet(:deposit, {state, currency, amount})
+    {newState, reply} = update_wallet(:deposit, {state, currency, amount})
+    {:reply, reply, newState}
   end
 
-  def handle_call({:withdraw, amount, currency}, _from, state) do
+  def handle_cast({:deposit, amount, currency}, state) do
+    Logger.debug("#{state[:id]} deposit #{amount}(#{currency})")
+    {newState, reply} = update_wallet(:deposit, {state, currency, amount})
+    do_replay(newState[:server], reply)
+    {:noreply, newState}
+  end
+
+  def handle_cast({:withdraw, amount, currency}, state) do
     Logger.debug("#{state[:id]} withdraw #{amount}(#{currency})")
-    update_wallet(:withdraw, {state, currency, amount})
+    {newState, reply} = update_wallet(:withdraw, {state, currency, amount})
+    do_replay(newState[:server], reply)
+    {:noreply, newState}
   end
 
-  def handle_call({:get_balance, currency}, _from, state) do
+  def handle_cast({:get_balance, currency}, state) do
     Logger.debug("#{state[:id]} get_balance (#{currency})")
-    {:reply, {:ok, Map.get(state, currency, 0)}, state}
+    reply = {:ok, Map.get(state, currency, 0)}
+    do_replay(state[:server], reply)
+    {:noreply, state}
   end
 
   def handle_call({:send, receiver_pid, amount, currency}, _from, state) do
     Logger.debug("#{state[:id]} send #{amount}(#{currency})")
 
     case update_wallet(:withdraw, {state, currency, amount}) do
-      {_, {:ok, from_user_balance}, new_state} ->
+      {newState, {:ok, from_user_balance}} ->
         case GenServer.call(receiver_pid, {:deposit, amount, currency}) do
           {:ok, to_user_balance} ->
-            {:reply, {:ok, from_user_balance, to_user_balance}, new_state}
+            {:reply, {:ok, from_user_balance, to_user_balance}, newState}
 
-          {:error, _} ->
+          _ ->
             {:reply, {:error, :receiver_error}, state}
         end
 
-      reply ->
+      {newState, reply} ->
         reply
     end
   end
@@ -51,31 +64,35 @@ defmodule UserWorker do
   end
 
   def terminate(reason, state) do
-    Logger.debug("#{state[:id]} #{reason}")
+    Logger.debug("#{state[:id]} #{inspect(reason)}")
     :ok
   end
 
   # ------Helpers-------
+
+  defp do_replay(pid, msg) do
+    GenServer.cast(pid, msg)
+  end
 
   defp update_wallet(:withdraw, {state, currency, amount}) do
     curAmount = Map.get(state, currency, 0)
 
     case curAmount < amount do
       true ->
-        {:reply, {:error, :not_enough_money}, state}
+        {state, {:error, :not_enough_money}}
 
       false ->
         newAmount = format_money(curAmount - amount)
-        new_state = Map.put(state, currency, newAmount)
-        {:reply, {:ok, new_state[currency]}, new_state}
+        newState = Map.put(state, currency, newAmount)
+        {newState, {:ok, newAmount}}
     end
   end
 
   defp update_wallet(:deposit, {state, currency, amount}) do
     curAmount = Map.get(state, currency, 0)
     newAmount = format_money(curAmount + amount)
-    new_state = Map.put(state, currency, newAmount)
-    {:reply, {:ok, new_state[currency]}, new_state}
+    newState = Map.put(state, currency, newAmount)
+    {newState, {:ok, newAmount}}
   end
 
   defp format_money(amount) when is_float(amount) do
