@@ -18,8 +18,7 @@ defmodule ExBanking do
   # ------API------
   @spec create_user(user :: String.t()) :: :ok | {:error, :wrong_arguments | :user_already_exists}
   def create_user(user) when is_binary(user) and user != "" do
-    Task.start(fn -> do_create_user(user) end)
-    :ok
+    do_create_user(user)
   end
 
   def create_user(user) do
@@ -92,59 +91,58 @@ defmodule ExBanking do
   # ------------------
 
   defp do_create_user(user) do
-      case Sup.init_user({user}) do
-        {:ok, _} ->
-          :ok
-        _ ->
-          {:error, :user_already_exists}
-      end
+    serverPid = Process.whereis(ExBanking)
+
+    case Sup.init_user({user, serverPid}) do
+      {:ok, _} ->
+        :ok
+
+      _ ->
+        {:error, :user_already_exists}
+    end
   end
 
   defp do_deposit(user, amount, currency) do
-      case find_user_and_check_queue(user) do
-        {:ok, pid} -> GenServer.cast(pid, {:deposit, amount, currency})
-        error -> {:error, error}
-      end
+    case find_user_and_check_queue(user) do
+      {:ok, pid} -> GenServer.cast(pid, {:deposit, amount, currency})
+      error -> {:error, error}
+    end
   end
 
   defp do_withdraw(user, amount, currency) do
-      case find_user_and_check_queue(user) do
-        {:ok, pid} -> GenServer.cast(pid, {:withdraw, amount, currency})
-        error -> {:error, error}
-      end
+    case find_user_and_check_queue(user) do
+      {:ok, pid} -> GenServer.cast(pid, {:withdraw, amount, currency})
+      error -> {:error, error}
+    end
   end
 
   defp do_get_balance(user, currency) do
-      case find_user_and_check_queue(user) do
-        {:ok, pid} -> GenServer.cast(pid, {:get_balance, currency})
-        error -> {:error, error}
-      end
+    case find_user_and_check_queue(user) do
+      {:ok, pid} -> GenServer.cast(pid, {:get_balance, currency})
+      error -> {:error, error}
+    end
   end
 
   defp do_send(from_user, to_user, amount, currency) do
-      case {find_user_and_check_queue(from_user), find_user_and_check_queue(to_user)} do
-        {{:ok, from_pid}, {:ok, to_pid}} ->
-          GenServer.cast(from_pid, {:send, to_pid, amount, currency})
+    case {find_user_and_check_queue(from_user), find_user_and_check_queue(to_user)} do
+      {{:ok, from_pid}, {:ok, to_pid}} ->
+        GenServer.cast(from_pid, {:send, to_pid, amount, currency})
 
-        {:user_does_not_exist, _} ->
-          {:error, :sender_does_not_exist}
+      {:user_does_not_exist, _} ->
+        {:error, :sender_does_not_exist}
 
-        {:too_many_requests_to_user, _} ->
-          {:error, :too_many_requests_to_sender}
+      {:too_many_requests_to_user, _} ->
+        {:error, :too_many_requests_to_sender}
 
-        {_, :user_does_not_exist} ->
-          {:error, :receiver_does_not_exist}
+      {_, :user_does_not_exist} ->
+        {:error, :receiver_does_not_exist}
 
-        {_, :too_many_requests_to_user} ->
-          {:error, :too_many_requests_to_receiver}
-      end
+      {_, :too_many_requests_to_user} ->
+        {:error, :too_many_requests_to_receiver}
+    end
   end
 
   # ------helpers------
-  def display(msg) do
-    GenServer.cast(__MODULE__, msg)
-  end
-
   defp find_user_and_check_queue(user) do
     case :global.whereis_name(user) do
       :undefined ->

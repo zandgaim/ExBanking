@@ -2,13 +2,12 @@ defmodule UserWorker do
   use GenServer
   require Logger
 
-  def start_link(user) do
+  def start_link(user, serverPid) do
     Logger.debug("start_link user #{user}")
-    GenServer.start_link(__MODULE__, [user], name: {:global, user})
+    GenServer.start_link(__MODULE__, [user, serverPid], name: {:global, user})
   end
 
-  def init([userId]) do
-    serverPid = Process.whereis(ExBanking)
+  def init([userId, serverPid]) do
     state = %{:id => userId, :server => serverPid}
     {:ok, state}
   end
@@ -40,22 +39,26 @@ defmodule UserWorker do
     {:noreply, state}
   end
 
-  def handle_call({:send, receiver_pid, amount, currency}, _from, state) do
+  def handle_cast({:send, receiver_pid, amount, currency}, state) do
     Logger.debug("#{state[:id]} send #{amount}(#{currency})")
 
-    case update_wallet(:withdraw, {state, currency, amount}) do
-      {newState, {:ok, from_user_balance}} ->
-        case GenServer.call(receiver_pid, {:deposit, amount, currency}) do
-          {:ok, to_user_balance} ->
-            {:reply, {:ok, from_user_balance, to_user_balance}, newState}
+    {newState, reply} =
+      case update_wallet(:withdraw, {state, currency, amount}) do
+        {newState, {:ok, from_user_balance}} ->
+          case GenServer.call(receiver_pid, {:deposit, amount, currency}) do
+            {:ok, to_user_balance} ->
+              {newState, {:ok, from_user_balance, to_user_balance}}
 
-          _ ->
-            {:reply, {:error, :receiver_error}, state}
-        end
+            _ ->
+              {state, {:error, :receiver_error}}
+          end
 
-      {newState, reply} ->
-        reply
-    end
+        {newState, reply} ->
+          {newState, reply}
+      end
+
+    do_replay(newState[:server], reply)
+    {:noreply, newState}
   end
 
   def handle_info(:timeout, state) do
