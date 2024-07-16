@@ -66,7 +66,7 @@ defmodule UserWorker do
     {:noreply, state}
   end
 
-  def terminate(reason, state) do
+  def terminate(reason, _state) do
     Logger.debug("#{state[:id]} #{inspect(reason)}")
     :ok
   end
