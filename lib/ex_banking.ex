@@ -15,13 +15,14 @@ defmodule ExBanking do
     {:noreply, state}
   end
 
-  # ------API------
+  # ------ API Functions ------
+
   @spec create_user(user :: String.t()) :: :ok | {:error, :wrong_arguments | :user_already_exists}
   def create_user(user) when is_binary(user) and user != "" do
     do_create_user(user)
   end
 
-  def create_user(user) do
+  def create_user(_user) do
     {:error, :wrong_arguments}
   end
 
@@ -37,7 +38,7 @@ defmodule ExBanking do
     do_deposit(user, amount, currency)
   end
 
-  def deposit(user, amount, currency) do
+  def deposit(_user, _amount, _currency) do
     {:error, :wrong_arguments}
   end
 
@@ -54,7 +55,7 @@ defmodule ExBanking do
     do_withdraw(user, amount, currency)
   end
 
-  def withdraw(user, amount, currency) do
+  def withdraw(_user, _amount, _currency) do
     {:error, :wrong_arguments}
   end
 
@@ -66,7 +67,7 @@ defmodule ExBanking do
     do_get_balance(user, currency)
   end
 
-  def get_balance(user, currency) do
+  def get_balance(_user, _currency) do
     {:error, :wrong_arguments}
   end
 
@@ -90,11 +91,11 @@ defmodule ExBanking do
     do_send(from_user, to_user, amount, currency)
   end
 
-  def send(from_user, to_user, amount, currency) do
+  def send(_from_user, _to_user, _amount, _currency) do
     {:error, :wrong_arguments}
   end
 
-  # ------------------
+   # ------------------
 
   defp do_create_user(user) do
     serverPid = Process.whereis(ExBanking)
@@ -148,7 +149,8 @@ defmodule ExBanking do
     end
   end
 
-  # ------helpers------
+  # ------ Helper Function ------
+
   defp find_user_and_check_queue(user) do
     case :global.whereis_name(user) do
       :undefined ->
