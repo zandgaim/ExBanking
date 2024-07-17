@@ -67,7 +67,7 @@ defmodule UserWorker do
   end
 
   def terminate(reason, _state) do
-    Logger.debug("#{state[:id]} #{inspect(reason)}")
+    Logger.debug("terminate, reason: #{inspect(reason)}")
     :ok
   end
 
